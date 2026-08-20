@@ -1,0 +1,89 @@
+cloud: "${ARIZE_CLOUD}"
+clusterName: "${ARIZE_CLUSTER_ARN}"
+region: "${ARIZE_REGION}"
+hubJwt: "${ARIZE_HUB_JWT}"
+gazetteBucket: "${ARIZE_GAZETTE_BUCKET}"
+druidBucket: "${ARIZE_DRUID_BUCKET}"
+
+organizationName: "${ARIZE_ORGANIZATION_NAME}"
+# legacyGlobalIdPrefix: "<stale example from a different cluster, kept for reference>"
+cipherKey: "${ARIZE_CIPHER_KEY}"
+clusterSizing: "${ARIZE_CLUSTER_SIZING}"
+collectNodeMetrics: ${ARIZE_COLLECT_NODE_METRICS}
+zoneAware: ${ARIZE_ZONE_AWARE}
+
+alyxEnabled: ${ARIZE_ALYX_ENABLED}
+
+# The URL used to reach the Arize UI once ingress endpoints are created
+appBaseUrl: "${ARIZE_APP_BASE_URL}"
+expBaseUrl: "${ARIZE_EXP_BASE_URL}"
+
+# AWS IAM role for pod-level bucket access
+awsServiceAccountRoleRwBucket: "${ARIZE_RW_BUCKET_ROLE_ARN}"
+
+realTimeUseLatestOffset: ${ARIZE_REALTIME_USE_LATEST_OFFSET}
+realTimeMutableCutoverDate: ${ARIZE_REALTIME_MUTABLE_CUTOVER_DATE}
+realTimeGlobalCutoverTime: ${ARIZE_REALTIME_GLOBAL_CUTOVER_TIME}
+realTimeSpaceCutoverTime: ${ARIZE_REALTIME_SPACE_CUTOVER_TIME}
+
+multiCloudGcpServiceAccountKey: "${ARIZE_GCP_SA_KEY}"
+
+# AWS Storage Classes
+storageClassAwsStandard: "${ARIZE_STORAGE_CLASS_AWS_STANDARD}"
+storageClassAwsSsd: "${ARIZE_STORAGE_CLASS_AWS_SSD}"
+
+postgresPassword: "${ARIZE_POSTGRES_PASSWORD}"
+
+smtpPassword: "${ARIZE_SMTP_PASSWORD}"
+smtpUser: "${ARIZE_SMTP_USER}"
+smtpHost: "${ARIZE_SMTP_HOST}"
+smtpSenderEmail: "${ARIZE_SMTP_SENDER_EMAIL}"
+smtpPort: ${ARIZE_SMTP_PORT}
+smtpRequireTls: ${ARIZE_SMTP_REQUIRE_TLS}
+
+dataFabricEnabled: ${ARIZE_DATA_FABRIC_ENABLED}
+dataFabricPermissionsCheckEnabled: ${ARIZE_DATA_FABRIC_PERMISSIONS_CHECK_ENABLED}
+
+internalEndpointsAppTlsCert: "${ARIZE_INTERNAL_TLS_CERT}"
+internalEndpointsAppTlsKey: "${ARIZE_INTERNAL_TLS_KEY}"
+
+flightTlsCert: "${ARIZE_FLIGHT_TLS_CERT}"
+flightTlsKey: "${ARIZE_FLIGHT_TLS_KEY}"
+
+# Only required if using a common node pool
+historicalNodePoolEnabled: ${ARIZE_HISTORICAL_NODE_POOL_ENABLED}
+
+enableCustomCodeEvals: ${ARIZE_ENABLE_CUSTOM_CODE_EVALS}
+
+# GCP 프로젝트 설정
+gcpProject: "${ARIZE_GCP_PROJECT}"
+
+# 3.2단계에서 생성한 credential-config.json을 base64 인코딩한 값
+
+# baseOverlay: |
+#   apiVersion: apps/v1
+#   kind: Deployment
+#   metadata:
+#     name: app-server
+#     namespace: arize
+#   spec:
+#     template:
+#       spec:
+#         containers:
+#           - name: app-server
+#             volumeMounts:
+#               - name: gcp-wif-token
+#                 mountPath: /var/run/service-account
+#                 readOnly: true
+#         volumes:
+#           - name: gcp-wif-token
+#             projected:
+#               sources:
+#                 - serviceAccountToken:
+#                     audience: "//iam.googleapis.com/projects/<gcp-project-number>/locations/global/workloadIdentityPools/<pool-name>/providers/<provider-name>"
+#                     expirationSeconds: 3600
+#                     path: token
+
+# --- Private registry (added for the automated upgrade pipeline) ---
+pushRegistry: "${ARIZE_PUSH_REGISTRY}"
+repoName: "${ARIZE_REPO_NAME}"
