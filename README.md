@@ -4,12 +4,22 @@ Automated upgrade pipeline for a self-hosted Arize AX cluster on EKS, with two h
 
 ## How it works
 
-1. **Daily at 09:00 UTC**, `check-release.yml` parses <https://arize.com/docs/ax/selfhosting/on-premise-releases.md> and compares the newest release against the deployed version.
+1. **On demand** (the daily schedule is currently disabled — see *Approval gates* below), `check-release.yml` parses <https://arize.com/docs/ax/selfhosting/on-premise-releases.md> and compares the newest release against the deployed version.
 2. If a newer release exists it dispatches `upgrade.yml`, which posts the release and every intervening **Upgrade Notes** section to chat with an **Approve image push** button.
 3. After approval, images are pulled from `ch.hub.arize.com` and pushed to ECR.
 4. Chat gets a second message with an **Approve install** button.
 5. After approval, `./arize.sh install` runs, gated on `install-status`.
 6. Chat gets the result with an **Open Arize** button, and a GitHub Release tagged `deployed/<version>` records the new state.
+
+> **Approval gates are not enforced right now.** GitHub only enforces
+> required reviewers on an environment for public repositories or paid plans.
+> This repo is private on a free plan, so the two `environment:` declarations
+> are labels that do not block. The daily schedule in `check-release.yml` is
+> disabled for that reason: nothing should start an upgrade on its own while
+> the gates are inert. **A manual run of `upgrade.yml` will still proceed
+> through both stages without pausing for approval.** To restore enforcement,
+> make the repo public or upgrade the plan, then re-add required reviewers to
+> the `image-push` and `cluster-install` environments.
 
 Approvals use **GitHub Environments**, so every button is a link into the run's approval page. That is why Slack and Teams are interchangeable — and why nothing here needs a public HTTPS endpoint or request-signature verification.
 
