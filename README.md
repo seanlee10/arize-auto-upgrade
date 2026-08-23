@@ -2,8 +2,6 @@
 
 Automated upgrade pipeline for a self-hosted Arize AX cluster on EKS, with two human approval gates in Slack or Microsoft Teams.
 
-> **Status:** the Python core is complete and tested. The GitHub Actions workflows, the `values.yaml` template, and the runner scripts are still being implemented — see `docs/superpowers/plans/` for what has landed. Sections below marked _(pending)_ describe files that do not exist yet.
-
 ## How it works
 
 1. **Daily at 09:00 UTC**, `check-release.yml` parses <https://arize.com/docs/ax/selfhosting/on-premise-releases.md> and compares the newest release against the deployed version.
@@ -132,7 +130,7 @@ Create two environments, each with **required reviewers**:
 
 **Slack (incoming webhook):** if your Slack app only carries the `incoming-webhook` scope rather than `chat:write`, use `NOTIFY_PROVIDER=slack_webhook` instead of `slack`. Create an incoming webhook (Slack app settings → **Incoming Webhooks** → **Add New Webhook to Workspace**) and set `SLACK_WEBHOOK_URL` (e.g. `https://hooks.slack.com/services/T000/B000/xxxx`) — nothing else. No bot token, no channel invite, and no `SLACK_CHANNEL_ID`, since the channel is fixed at webhook creation. Like Teams, incoming webhooks cannot thread, so the four upgrade messages arrive as separate posts rather than a thread; use the bot-token `slack` provider instead if you want threading.
 
-### 5. Values template _(pending)_
+### 5. Values template 
 
 `config/values.template.yaml` is generated from a real `values.yaml`:
 
@@ -151,7 +149,7 @@ Your live `values.yaml` contains a GCP service-account private key, two TLS priv
 
 ## Operational notes
 
-- **Disk.** `pull-images` stages 26 container images through the local Docker daemon. `ubuntu-latest` has ~14 GB free on `/` but ~65 GB on `/mnt`, so `scripts/prepare-runner-disk.sh` _(pending)_ relocates Docker's `data-root` before the pull. If a future release still overflows, switch to `./arize.sh -y -q --skopeo load-remote-images`, which copies registry-to-registry and uses no local disk.
+- **Disk.** `pull-images` stages 26 container images through the local Docker daemon. `ubuntu-latest` has ~14 GB free on `/` but ~65 GB on `/mnt`, so `scripts/prepare-runner-disk.sh`  relocates Docker's `data-root` before the pull. If a future release still overflows, switch to `./arize.sh -y -q --skopeo load-remote-images`, which copies registry-to-registry and uses no local disk.
 - **Concurrency.** A run paused at an approval gate reports GitHub status `waiting`. The scheduled check treats `waiting`, `queued` and `in_progress` alike as "an upgrade is active", and treats a failed `gh` call the same way, so neither a long approval wait nor a GitHub outage can trigger a second concurrent upgrade.
 - **Approvals expire.** GitHub cancels a run awaiting approval after 30 days; the next scheduled check re-detects and re-dispatches.
 - **Parsing, not an API.** The release notes are parsed from the docs site's markdown twin. Zero parsed releases is always a hard failure with an alert — a docs redesign must never look like "no new release".

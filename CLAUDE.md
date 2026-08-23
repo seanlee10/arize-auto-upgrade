@@ -67,4 +67,4 @@ check-release.yml (cron)  →  upgrade.yml
 
 ## Design docs
 
-`docs/superpowers/specs/` holds the design and its rationale; `docs/superpowers/plans/` holds the implementation plan. The spec is the authority — when the plan and the spec disagree, the spec wins.
+The design spec and implementation plan are kept locally, outside version control (`docs/` is gitignored). They are not required to work in this repo.

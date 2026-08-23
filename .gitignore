@@ -5,8 +5,9 @@ __pycache__/
 .venv/
 arize-distribution-*/
 
-# ~/.gitignore_global excludes "docs"; this repo needs it tracked
-!docs/
+# Design docs stay local: they quote vendor-internal detail and are not
+# part of what this repo distributes.
+docs/
 .superpowers/
 *.egg-info/
 
