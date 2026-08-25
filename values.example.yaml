@@ -1,0 +1,129 @@
+# Example values.yaml for the automated Arize AX upgrade pipeline.
+#
+#     cp values.example.yaml values.yaml
+#
+# ...then replace every REPLACE_ME. Your real values.yaml is gitignored and
+# must never be committed: it carries a GCP service-account key, two TLS
+# private keys, the Postgres password, SMTP credentials and the hub JWT.
+# Only this example file is tracked.
+#
+# Keys are in the same order as the values.yaml Arize ships, so this file
+# diffs cleanly against the vendor's. Two rules of thumb:
+#
+#   * REPLACE_ME       -> no sensible default exists; you must supply it.
+#   * everything else  -> a working default, or a placeholder whose SHAPE
+#                         shows what the real value looks like. Cluster
+#                         identity, buckets and URLs are all dummies from a
+#                         fictional "arize-prod" cluster in account
+#                         123456789012 -- change them.
+
+cloud: "aws"
+
+# The FULL EKS ARN, not the short cluster name. arize.sh runs
+# `kubectl --cluster=$clusterName` against exactly this string, so a short
+# name here fails at install time with a confusing context error.
+clusterName: "arn:aws:eks:us-east-1:123456789012:cluster/arize-prod"
+region: "us-east-1"
+
+# The BASE64 form of the hub JWT, not the raw token: arize.sh does
+# `license=$(echo -n $hubJwt | base64 -d)`. The pipeline separately needs the
+# raw JWT for the distribution download -- see ARIZE_HUB_JWT_RAW in README.
+hubJwt: "REPLACE_ME_BASE64_ENCODED_HUB_JWT"
+
+gazetteBucket: "arize-prod-gazette-bucket"
+druidBucket: "arize-prod-druid-bucket"
+
+organizationName: "example-org"
+cipherKey: "REPLACE_ME_CIPHER_KEY"
+clusterSizing: "test"
+collectNodeMetrics: true
+zoneAware: false
+
+alyxEnabled: false
+
+# The URL used to reach the Arize UI once ingress endpoints are created
+appBaseUrl: "https://arize-app.example.com"
+expBaseUrl: "https://grpc.example.com"
+
+# AWS IAM role for pod-level bucket access
+awsServiceAccountRoleRwBucket: "arn:aws:iam::123456789012:role/arize-prod-webidentity-role-rw"
+
+# Leave the cutover dates far in the future unless Arize tells you otherwise;
+# they gate irreversible realtime-ingestion migrations.
+realTimeUseLatestOffset: false
+realTimeMutableCutoverDate: 3000-01-01T00:00:00Z
+realTimeGlobalCutoverTime: 3000-01-01T00:00:00Z
+realTimeSpaceCutoverTime: 3000-01-01T00:00:00Z
+
+# Base64 of the credential-config.json created during GCP workload-identity
+# setup -- one long line, no newlines.
+multiCloudGcpServiceAccountKey: "REPLACE_ME_BASE64_ENCODED_GCP_CREDENTIAL_CONFIG_JSON"
+
+# AWS Storage Classes
+storageClassAwsStandard: "gp3"
+storageClassAwsSsd: "gp3"
+
+postgresPassword: "REPLACE_ME_POSTGRES_PASSWORD"
+
+smtpPassword: "REPLACE_ME_SMTP_PASSWORD"
+smtpUser: "REPLACE_ME_SMTP_USER"
+smtpHost: "email-smtp.us-east-1.amazonaws.com"
+smtpSenderEmail: "arize-ops@example.com"
+smtpPort: 587
+smtpRequireTls: true
+
+dataFabricEnabled: true
+dataFabricPermissionsCheckEnabled: true
+
+# TLS material, in whatever encoding your existing values.yaml already uses
+# (Arize's installer accepts a single-line PEM with escaped newlines, or
+# base64). Keep each on one line -- a raw multi-line PEM pasted here will not
+# parse as YAML without a block scalar.
+internalEndpointsAppTlsCert: "REPLACE_ME_INTERNAL_TLS_CERT"
+internalEndpointsAppTlsKey: "REPLACE_ME_INTERNAL_TLS_KEY"
+
+flightTlsCert: "REPLACE_ME_FLIGHT_TLS_CERT"
+flightTlsKey: "REPLACE_ME_FLIGHT_TLS_KEY"
+
+# Only required if using a common node pool
+historicalNodePoolEnabled: true
+
+enableCustomCodeEvals: true
+
+gcpProject: "example-gcp-project"
+
+# Optional: mount a projected GCP workload-identity token into app-server.
+# Uncomment and fill in the pool/provider path if Arize's setup guide told you
+# to. Left commented out, nothing here applies.
+#
+# baseOverlay: |
+#   apiVersion: apps/v1
+#   kind: Deployment
+#   metadata:
+#     name: app-server
+#     namespace: arize
+#   spec:
+#     template:
+#       spec:
+#         containers:
+#           - name: app-server
+#             volumeMounts:
+#               - name: gcp-wif-token
+#                 mountPath: /var/run/service-account
+#                 readOnly: true
+#         volumes:
+#           - name: gcp-wif-token
+#             projected:
+#               sources:
+#                 - serviceAccountToken:
+#                     audience: "//iam.googleapis.com/projects/<gcp-project-number>/locations/global/workloadIdentityPools/<pool-name>/providers/<provider-name>"
+#                     expirationSeconds: 3600
+#                     path: token
+
+# --- Private registry (added for the automated upgrade pipeline) ---
+#
+# The vendor's own values.yaml does NOT define these two. Without them
+# arize.sh pushes to and pulls from Arize's registry instead of your ECR,
+# which silently defeats the whole point of the push-images stage.
+pushRegistry: "123456789012.dkr.ecr.us-east-1.amazonaws.com"
+repoName: "arize"

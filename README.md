@@ -35,9 +35,38 @@ This tool upgrades a production cluster. Three properties are worth knowing up f
 
 Nothing environment-specific is hardcoded anywhere in this repo — every cluster/account/region/URL value below comes from a GitHub Actions **Variable** or **Secret**. `config/values.template.yaml` is 100% `${VAR}` placeholders; `scripts/render-values.sh` fails closed if a required one is missing.
 
-### 1. Repository variables
+### 1. Get your own private copy of this repo
 
-Non-secret. Two groups: the pipeline's own workflow variables, and the `ARIZE_*` variables that `scripts/render-values.sh` substitutes into `config/values.template.yaml` (see step 5).
+Run the pipeline from **your own private copy**, never from this repository. That copy is what carries your cluster's identity: the EKS cluster ARN, the ECR registry, the hub JWT, and every Variable and Secret in the next two steps are set on it, not here.
+
+Private matters because those Secrets grant push access to your ECR and install rights on a production EKS cluster, and the Actions logs describe your cluster's topology.
+
+**If you can see this repository while it is private,** a fork inherits that visibility and is already private:
+
+```bash
+gh repo fork <owner>/arize-upgrade --clone --fork-name arize-upgrade
+```
+
+**If you are copying from a public source, a fork will not work.** GitHub forks inherit the parent's visibility, and a fork of a public repository cannot be switched to private afterwards. Duplicate it into a fresh private repo instead:
+
+```bash
+gh repo create <your-org>/arize-upgrade --private
+git clone --bare https://github.com/<owner>/arize-upgrade.git
+cd arize-upgrade.git
+git push --mirror https://github.com/<your-org>/arize-upgrade.git
+```
+
+Either way, add the source as an `upstream` remote to pull in later pipeline fixes. Your Variables, Secrets and environments live in GitHub settings rather than in the code, so they survive that merge untouched.
+
+> **A private copy on a free plan has no working approval gates.** GitHub enforces
+> required reviewers only for public repositories or paid plans — see the callout
+> under *How it works*. On a Team or Enterprise plan the gates behave as designed;
+> on a free plan, leave the daily schedule disabled and treat every `upgrade.yml`
+> run as unattended.
+
+### 2. Repository variables
+
+Non-secret. Two groups: the pipeline's own workflow variables, and the `ARIZE_*` variables that `scripts/render-values.sh` substitutes into `config/values.template.yaml` (see step 6).
 
 **Workflow variables** (read directly by the Python CLI / workflows):
 
@@ -104,7 +133,7 @@ The pipeline **never guesses** the deployed version. On the very first run there
 | `ARIZE_HISTORICAL_NODE_POOL_ENABLED` | `true` | `historicalNodePoolEnabled` |
 | `ARIZE_ENABLE_CUSTOM_CODE_EVALS` | `true` | `enableCustomCodeEvals` |
 
-### 2. Secrets
+### 3. Secrets
 
 Set on **both** the `image-push` and `cluster-install` environments:
 
@@ -123,7 +152,7 @@ Set on **both** the `image-push` and `cluster-install` environments:
 
 `check-release.yml` additionally needs repository-level `SLACK_BOT_TOKEN`, `TEAMS_WEBHOOK_URL`, or `SLACK_WEBHOOK_URL`, matching whichever provider is selected.
 
-### 3. Environments
+### 4. Environments
 
 Create two environments, each with **required reviewers**:
 
@@ -132,7 +161,7 @@ Create two environments, each with **required reviewers**:
 
 **Without reviewers configured the jobs run unattended and there are no approvals at all.** This is the single easiest thing to get wrong.
 
-### 4. Chat
+### 5. Chat
 
 **Slack:** create an app with the `chat:write` bot scope, install it, invite it to the channel, then set `SLACK_BOT_TOKEN` (`xoxb-…`) and `SLACK_CHANNEL_ID`. All four messages of an upgrade thread under the first.
 
@@ -140,7 +169,7 @@ Create two environments, each with **required reviewers**:
 
 **Slack (incoming webhook):** if your Slack app only carries the `incoming-webhook` scope rather than `chat:write`, use `NOTIFY_PROVIDER=slack_webhook` instead of `slack`. Create an incoming webhook (Slack app settings → **Incoming Webhooks** → **Add New Webhook to Workspace**) and set `SLACK_WEBHOOK_URL` (e.g. `https://hooks.slack.com/services/T000/B000/xxxx`) — nothing else. No bot token, no channel invite, and no `SLACK_CHANNEL_ID`, since the channel is fixed at webhook creation. Like Teams, incoming webhooks cannot thread, so the four upgrade messages arrive as separate posts rather than a thread; use the bot-token `slack` provider instead if you want threading.
 
-### 5. Values template 
+### 6. Values template 
 
 `config/values.template.yaml` is generated from a real `values.yaml`:
 
