@@ -1,4 +1,5 @@
-values.yaml
+# 렌더 결과(비밀 포함)만 무시한다. config/values.yaml 은 체크인 대상이다.
+/values.yaml
 .env
 __pycache__/
 *.pyc
