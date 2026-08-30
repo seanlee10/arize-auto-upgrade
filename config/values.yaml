@@ -54,6 +54,12 @@ smtpSenderEmail: "yihsean@gmail.com"
 smtpPort: 587
 smtpRequireTls: true
 
+# 11.45.0 부터 blobOffloadEnabled 기본값이 true 로 바뀐다. 켜려면 druidBucket 의
+# CORS 와 접근 권한을 먼저 구성해야 하고, 그 전에는 새 pre-check 가 업그레이드를
+# 막는다. 이 클러스터는 지금까지 false 로 운영해 왔으므로 현행을 명시해 유지한다.
+# 활성화하려면 버킷 구성을 먼저 마친 뒤 true 로 바꿀 것.
+blobOffloadEnabled: false
+
 dataFabricEnabled: true
 dataFabricPermissionsCheckEnabled: true
 
