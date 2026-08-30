@@ -19,7 +19,12 @@
 # retries and then times out, which is what happened.
 set -euo pipefail
 
-REQUIRED_GB="${REQUIRED_GB:-40}"
+# Grounded in the real bundle: ~7 GB on disk, of which 6.1 GB is compressed
+# image tarballs. Those expand roughly 2-2.5x once they are layers in the
+# Docker store, and the bundle stays on disk alongside them — call it 25 GB.
+# 30 keeps headroom for a larger release. The run that actually died mid-pull
+# (33302654578) had 13 GB.
+REQUIRED_GB="${REQUIRED_GB:-30}"
 
 avail_gb() { df -BG --output=avail "$1" | tail -1 | tr -dc '0-9'; }
 report()   { echo "▶ $1:"; df -h / /mnt 2>/dev/null || df -h /; }
@@ -67,7 +72,7 @@ report "Disk after"
 free_gb="$(avail_gb "${target}")"
 echo "▶ Freed $(( free_gb - before )) GB; ${free_gb} GB available on ${target}"
 if [ "${free_gb}" -lt "${REQUIRED_GB}" ]; then
-  echo "🛑 only ${free_gb} GB free on ${target}, need ${REQUIRED_GB} GB for 26 images" >&2
+  echo "🛑 only ${free_gb} GB free on ${target}, need ${REQUIRED_GB} GB for the 26 images plus the bundle" >&2
   echo "   Raise REQUIRED_GB only if you know the bundle is smaller." >&2
   exit 1
 fi
