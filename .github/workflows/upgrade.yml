@@ -135,9 +135,16 @@ jobs:
         if: always()
         run: |
           set -euo pipefail
+          # values.yaml first: it carries the private keys, and it must go even
+          # if the pull or push failed.
           rm -f dist/*/values.yaml
-          docker image prune -af || true
-          df -h /mnt
+          # The 26 images exist in ECR now, so nothing here is worth keeping.
+          # prune -af alone leaves build cache and volumes behind; on a runner
+          # with no separate /mnt those sit on the same 72 GB disk as everything
+          # else. Report whichever filesystem Docker actually uses rather than
+          # assuming /mnt exists.
+          docker system prune -af --volumes || true
+          df -h "$(docker info --format '{{.DockerRootDir}}' 2>/dev/null || echo /)"
 
   announce-images:
     name: Request install approval
