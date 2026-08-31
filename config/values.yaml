@@ -120,9 +120,14 @@ gcpProject: "anne-2f587"
 #   [noNs] 는 kustomize 가 "네임스페이스 없는 것"을 찾았다는 뜻이다. 새 대상을 추가할
 #   때는 /distributions/<ver>/manifests/base/ 에서 해당 리소스를 먼저 확인할 것.
 #
-# [범위] druid-compaction 한 문서만 둔다. 노드 CPU/메모리 requests 를 늘리지
-#   않으므로 클러스터 용량에 영향이 없다. Xmx 는 이미 있는 limits.memory 16Gi
-#   안이고, empty-tmp 는 파드마다 별도 EBS 라 노드 자원과 무관하다.
+# [범위] sizing_test 가 과소 설정한 /tmp 볼륨 두 개만 덮는다. 어느 문서도 노드
+#   CPU/메모리 requests 를 늘리지 않으므로 클러스터 용량에 영향이 없다. Xmx 는
+#   이미 있는 limits.memory 16Gi 안이고, /tmp 는 파드마다 별도 EBS 라 노드 자원과
+#   무관하다.
+#   근본적으로는 clusterSizing 프로파일이 문제다. sizing_test 는 druidloader 1Gi,
+#   druid-compaction 5Gi, receiver 5Gi, gazette 20Gi 를 설정하는데 Arize 자체
+#   prod 는 druidloader 에만 32~64Gi 를 쓴다. 개별 오버레이는 두더지잡기이므로
+#   용량 계획을 세워 프로파일 상향을 별도로 판단할 것.
 #
 # [empty-tmp 5Gi -> 50Gi]
 #   기본 5Gi 가 소진되어 55분간 ENOSPC 810건이 발생했고 색인이 정지했다.
@@ -136,6 +141,24 @@ gcpProject: "anne-2f587"
 #
 # [주의] limits.memory 를 줄이려면 Xmx 를 먼저 낮출 것. 힙이 컨테이너 한도를
 #   넘으면 커널이 kill 한다.
+#
+# [druidloader /tmp 1Gi -> 50Gi]
+#   druidloader 는 샤드별/데이터소스별 arrow 파일을 /tmp 에 버퍼링한 뒤 S3 에
+#   올린다. sizing_test 의 1Gi 는 실부하에서 즉시 찬다. 2026-08-31 에 1200 rps 로
+#   ENOSPC 가 발생해 tracing-records 샤드 8개가 전부 FAILED 로 떨어졌고 클러스터
+#   전체 트레이스 입수가 멈췄다(저널 30GB 정체).
+#     arrow/ipc: could not write magic Arrow bytes:
+#       write /tmp/druidloader/tracing-records/shard_007-.../... : no space left on device
+#     servePrimary failed err="...app.FinalizeTxn: Finalize called on empty builder"
+#   쓰기 실패가 arrowWriter.Builder 를 nil 로 만드는데 AppendRow 에는 같은 파일의
+#   Convert 와 달리 recover() 가 없어 SIGSEGV 로 샤드 고루틴이 죽는다. FAILED 샤드는
+#   자동 복구되지 않는 반면 파드는 Running/Ready 로 남아 헬스체크에 걸리지 않는다.
+#   즉 이 볼륨 증설은 방아쇠만 막는다. 증폭 경로는 코드 수정이 필요하다.
+#   50Gi 는 on-prem 오버레이의 기본값이다. replicas 3 기준 gp3 150Gi 를 쓴다.
+#
+# [namespace 는 문서마다 다르다 — 위 규칙을 문서별로 적용할 것]
+#   druid-compaction (druid-indexing.yaml)  -> namespace: 'arize' 있음 -> 쓴다
+#   druidloader      (druidloader.yaml)     -> namespace 없음          -> 쓰지 않는다
 baseOverlay: |
   apiVersion: apps/v1
   kind: Deployment
@@ -164,6 +187,26 @@ baseOverlay: |
                 value: >-
                   -Ddruid.properties.file=/etc/druid/runtime.properties
                   -Xmx10g -Xms10g -XX:MaxDirectMemorySize=2g
+  ---
+  apiVersion: apps/v1
+  kind: Deployment
+  metadata:
+    name: druidloader
+  spec:
+    template:
+      spec:
+        volumes:
+          - name: druidloader
+            ephemeral:
+              volumeClaimTemplate:
+                spec:
+                  accessModes:
+                    - ReadWriteOnce
+                  storageClassName: gp3
+                  volumeMode: Filesystem
+                  resources:
+                    requests:
+                      storage: 50Gi
 
 # --- baseTransformer ---
 # receiver 의 --postgres_max_open_conns 를 추가한다.
