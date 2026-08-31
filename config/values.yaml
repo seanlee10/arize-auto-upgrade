@@ -156,9 +156,13 @@ gcpProject: "anne-2f587"
 #   즉 이 볼륨 증설은 방아쇠만 막는다. 증폭 경로는 코드 수정이 필요하다.
 #   50Gi 는 on-prem 오버레이의 기본값이다. replicas 3 기준 gp3 150Gi 를 쓴다.
 #
-# [namespace 는 문서마다 다르다 — 위 규칙을 문서별로 적용할 것]
-#   druid-compaction (druid-indexing.yaml)  -> namespace: 'arize' 있음 -> 쓴다
-#   druidloader      (druidloader.yaml)     -> namespace 없음          -> 쓰지 않는다
+# [namespace 는 문서마다 다르다 — 문서별로 확인할 것]
+#   판단 기준은 리포지토리 소스가 아니라 배포판이 렌더한 매니페스트다.
+#   2026-08-31 에 리포의 manifests/druidloader/manifests/druidloader.yaml 에
+#   namespace 선언이 없는 것을 보고 patch 에서 뺐는데, install 은 에러 없이 통과한
+#   반면 Deployment 의 볼륨은 1Gi 그대로였다. 즉 대상을 못 찾아도 조용히 넘어갈 수
+#   있으므로 install 성공을 반영 성공으로 읽으면 안 된다. 반영 여부는 항상
+#   kubectl get deploy <name> -o jsonpath 로 실제 스펙을 확인할 것.
 baseOverlay: |
   apiVersion: apps/v1
   kind: Deployment
@@ -192,6 +196,7 @@ baseOverlay: |
   kind: Deployment
   metadata:
     name: druidloader
+    namespace: arize
   spec:
     template:
       spec:
