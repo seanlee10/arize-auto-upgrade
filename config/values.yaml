@@ -156,13 +156,21 @@ gcpProject: "anne-2f587"
 #   즉 이 볼륨 증설은 방아쇠만 막는다. 증폭 경로는 코드 수정이 필요하다.
 #   50Gi 는 on-prem 오버레이의 기본값이다. replicas 3 기준 gp3 150Gi 를 쓴다.
 #
-# [namespace 는 문서마다 다르다 — 문서별로 확인할 것]
-#   판단 기준은 리포지토리 소스가 아니라 배포판이 렌더한 매니페스트다.
-#   2026-08-31 에 리포의 manifests/druidloader/manifests/druidloader.yaml 에
-#   namespace 선언이 없는 것을 보고 patch 에서 뺐는데, install 은 에러 없이 통과한
-#   반면 Deployment 의 볼륨은 1Gi 그대로였다. 즉 대상을 못 찾아도 조용히 넘어갈 수
-#   있으므로 install 성공을 반영 성공으로 읽으면 안 된다. 반영 여부는 항상
-#   kubectl get deploy <name> -o jsonpath 로 실제 스펙을 확인할 것.
+# [namespace: 두 문서 모두 'arize' 를 쓴다]
+#   판단 기준은 리포지토리 소스가 아니라 배포판이 렌더한 매니페스트
+#   (/distributions/<ver>/manifests/base) 다. 2026-08-31 에 리포의
+#   manifests/druidloader/manifests/druidloader.yaml 에 namespace 선언이 없는 것을
+#   보고 patch 에서 뺐다가 오퍼레이터가 이렇게 죽었다:
+#     no resource matches strategic merge patch "Deployment.v1.apps/druidloader.[noNs]"
+#     Failed to reconcile — Will not retry
+#   [noNs] 는 kustomize 가 "네임스페이스 없는 대상"을 찾았다는 뜻이다.
+#
+# [진단 시 주의] 이때 GH Actions 의 Install 단계는 즉시 죽지 않는다. 오퍼레이터가
+#   reconcile 을 포기한 채로 arize.sh 가 -t 3600 만큼 정상화를 기다리다 타임아웃한다.
+#   즉 "install 이 오래 걸린다"의 실체가 이 에러일 수 있다. 15분을 넘기면 잡 로그를
+#   기다리지 말고(완료 전에는 안 나온다) 오퍼레이터 로그를 볼 것:
+#     kubectl -n arize-operator logs arize-op-arize-operator-operator-0 \
+#       --since=60m | grep ApplyKustomizations
 baseOverlay: |
   apiVersion: apps/v1
   kind: Deployment
