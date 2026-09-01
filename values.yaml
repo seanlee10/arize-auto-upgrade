@@ -1,0 +1,58 @@
+cloud: "aws"
+clusterName: "arn:aws:eks:ap-northeast-2:507911341146:cluster/sean-test"
+region: "ap-northeast-2"
+hubJwt: "${ARIZE_HUB_JWT}"
+gazetteBucket: "sean-test-gazette-bucket"
+druidBucket: "sean-test-druid-bucket"
+
+organizationName: "sean-test"
+# legacyGlobalIdPrefix: "UPyramal Financearn:aws:eks:ap-south-1:581962035245:cluster/arize-cluster-uauglobalid"
+cipherKey: "${ARIZE_CIPHER_KEY}"
+clusterSizing: "nonha"
+collectNodeMetrics: true
+zoneAware: false
+
+alyxEnabled: false
+
+# The URL used to reach the Arize UI once ingress endpoints are created
+appBaseUrl: "https://arize-app.iqhub.co"
+expBaseUrl: "https://grpc.iqhub.co"
+
+# AWS IAM role for pod-level bucket access
+awsServiceAccountRoleRwBucket: "arn:aws:iam::507911341146:role/sean-test-webidentity-role-rw"
+
+multiCloudGcpServiceAccountKey: "${ARIZE_GCP_SA_KEY}"
+
+# AWS Storage Classes
+storageClassAwsStandard: "gp3"
+storageClassAwsSsd: "gp3"
+
+postgresPassword: "${ARIZE_POSTGRES_PASSWORD}"
+
+smtpPassword: "${ARIZE_SMTP_PASSWORD}"
+smtpUser: "${ARIZE_SMTP_USER}"
+smtpHost: "email-smtp.ap-northeast-2.amazonaws.com"
+smtpSenderEmail: "yihsean@gmail.com"
+smtpPort: 587
+smtpRequireTls: true
+
+dataFabricEnabled: true
+dataFabricPermissionsCheckEnabled: true
+
+internalEndpointsAppTlsCert: "${ARIZE_INTERNAL_TLS_CERT}"
+internalEndpointsAppTlsKey: "${ARIZE_INTERNAL_TLS_KEY}"
+
+flightTlsCert: "${ARIZE_FLIGHT_TLS_CERT}"
+flightTlsKey: "${ARIZE_FLIGHT_TLS_KEY}"
+
+# Only required if using a common node pool
+historicalNodePoolEnabled: false
+
+enableCustomCodeEvals: true
+
+# GCP 프로젝트 설정
+gcpProject: "anne-2f587"
+
+# Private registry settings used by this upgrade pipeline.
+pushRegistry: "507911341146.dkr.ecr.ap-northeast-2.amazonaws.com"
+repoName: "arize"

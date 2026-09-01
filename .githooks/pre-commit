@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+# Reject credentials in the checked-in deployment configuration.
+set -euo pipefail
+
+readonly sensitive='^(hubJwt|cipherKey|postgresPassword|smtpUser|smtpPassword|multiCloudGcpServiceAccountKey|internalEndpointsAppTlsCert|internalEndpointsAppTlsKey|flightTlsCert|flightTlsKey):'
+failed=0
+
+while IFS= read -r -d '' path; do
+  content="$(git show ":${path}")"
+
+  if printf '%s\n' "${content}" | grep -Eq -- '-----BEGIN ([A-Z0-9 ]+ )?(PRIVATE KEY|CERTIFICATE)-----'; then
+    echo "pre-commit: credential material detected in ${path}" >&2
+    failed=1
+  fi
+
+  if [ "${path}" = "values.yaml" ]; then
+    if printf '%s\n' "${content}" | awk -F: -v pattern="${sensitive}" '
+      $0 ~ pattern {
+        value = $0
+        sub(/^[^:]+:[[:space:]]*/, "", value)
+        gsub(/^[\" ]+|[\" ]+$/, "", value)
+        if (value != "" && value !~ /^(REPLACE_ME|\$\{[^}]+\})/) found = 1
+      }
+      END { exit found ? 0 : 1 }
+    '; then
+      echo "pre-commit: non-empty sensitive value detected in values.yaml" >&2
+      failed=1
+    fi
+  fi
+done < <(git diff --cached --name-only -z --diff-filter=ACMR)
+
+if [ "${failed}" -ne 0 ]; then
+  echo "Remove credentials from staged files before committing." >&2
+  exit 1
+fi

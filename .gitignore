@@ -1,4 +1,4 @@
-values.yaml
+# values.yaml is the checked-in deployment source of truth.
 .env
 __pycache__/
 *.pyc
