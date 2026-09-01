@@ -19,10 +19,6 @@ concurrency:
 env:
   RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
   NOTIFY_PROVIDER: ${{ vars.NOTIFY_PROVIDER }}
-  PUSH_REGISTRY: ${{ vars.PUSH_REGISTRY }}
-  APP_BASE_URL: ${{ vars.APP_BASE_URL }}
-  AWS_REGION: ${{ vars.AWS_REGION }}
-  EKS_CLUSTER_NAME: ${{ vars.EKS_CLUSTER_NAME }}
 
 jobs:
   announce:
@@ -57,6 +53,9 @@ jobs:
     runs-on: ubuntu-latest
     environment: image-push
     timeout-minutes: 180
+    env:
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -70,23 +69,26 @@ jobs:
         run: ./scripts/prepare-runner-disk.sh
 
       - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ vars.AWS_REGION }}
+        run: |
+          set -euo pipefail
+          export AWS_REGION="$(sed -n 's/^region: *"\(.*\)"$/\1/p' values.yaml)"
+          export AWS_DEFAULT_REGION="${AWS_REGION}"
+          aws sts get-caller-identity >/dev/null
 
       - name: Log in to ECR
         run: |
           set -euo pipefail
+          AWS_REGION="$(sed -n 's/^region: *"\(.*\)"$/\1/p' values.yaml)"
+          PUSH_REGISTRY="$(sed -n 's/^pushRegistry: *"\(.*\)"$/\1/p' values.yaml)"
           aws ecr get-login-password --region "${AWS_REGION}" \
             | docker login --username AWS --password-stdin "${PUSH_REGISTRY}"
 
       - name: Download the distribution
         env:
-          JWT: ${{ secrets.ARIZE_HUB_JWT_RAW }}
+          ARIZE_HUB_JWT: ${{ secrets.ARIZE_HUB_JWT }}
         run: |
           set -euo pipefail
+          JWT="$(printf '%s' "${ARIZE_HUB_JWT}" | base64 --decode)"
           mkdir -p dist && cd dist
           # Piped to bash, not sh: the vendor's script uses `set -o pipefail`,
           # which dash (Ubuntu's /bin/sh) rejects with "Illegal option -o pipefail".
@@ -106,9 +108,8 @@ jobs:
             --dir dist \
             --expect "${TARGET_VERSION}"
 
-      - name: Render values.yaml
+      - name: Render values.yaml from checked-in config and Secrets
         env:
-          # Credentials -> environment Secrets
           ARIZE_HUB_JWT: ${{ secrets.ARIZE_HUB_JWT }}
           ARIZE_CIPHER_KEY: ${{ secrets.ARIZE_CIPHER_KEY }}
           ARIZE_POSTGRES_PASSWORD: ${{ secrets.ARIZE_POSTGRES_PASSWORD }}
@@ -119,9 +120,9 @@ jobs:
           ARIZE_INTERNAL_TLS_KEY: ${{ secrets.ARIZE_INTERNAL_TLS_KEY }}
           ARIZE_FLIGHT_TLS_CERT: ${{ secrets.ARIZE_FLIGHT_TLS_CERT }}
           ARIZE_FLIGHT_TLS_KEY: ${{ secrets.ARIZE_FLIGHT_TLS_KEY }}
-          # Non-secret config is literal in config/values.yaml (checked in),
-          # so only Secrets are injected here.
-        run: ./scripts/render-values.sh "${{ steps.bundle.outputs.bundle_dir }}/values.yaml"
+        run: |
+          set -euo pipefail
+          scripts/render-values.sh "${{ steps.bundle.outputs.bundle_dir }}/values.yaml"
 
       - name: Pull images from the Arize registry
         working-directory: ${{ steps.bundle.outputs.bundle_dir }}
@@ -164,6 +165,7 @@ jobs:
           TARGET_VERSION: ${{ inputs.target_version }}
         run: |
           set -euo pipefail
+          export PUSH_REGISTRY="$(sed -n 's/^pushRegistry: *"\(.*\)"$/\1/p' values.yaml)"
           arize-upgrade notify \
             --stage images \
             --target "${TARGET_VERSION}" \
@@ -175,6 +177,9 @@ jobs:
     runs-on: ubuntu-latest
     environment: cluster-install
     timeout-minutes: 240
+    env:
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
     outputs:
       touched: ${{ steps.mark.outputs.touched }}
     steps:
@@ -187,11 +192,11 @@ jobs:
       - run: pip install --quiet -e .
 
       - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ vars.AWS_REGION }}
+        run: |
+          set -euo pipefail
+          export AWS_REGION="$(sed -n 's/^region: *"\(.*\)"$/\1/p' values.yaml)"
+          export AWS_DEFAULT_REGION="${AWS_REGION}"
+          aws sts get-caller-identity >/dev/null
 
       - uses: azure/setup-helm@v4
         with:
@@ -203,15 +208,17 @@ jobs:
           # arize.sh runs `kubectl --cluster=$clusterName` where clusterName is the
           # ARN in values.yaml. Derive the ARN from AWS and compare it against the
           # checked-in file itself, so the two cannot silently disagree.
-          ARIZE_CLUSTER_ARN=$(sed -n 's/^clusterName: *"\(.*\)"$/\1/p' config/values.yaml)
+          ARIZE_CLUSTER_ARN=$(sed -n 's/^clusterName: *"\(.*\)"$/\1/p' values.yaml)
+          AWS_REGION=$(sed -n 's/^region: *"\(.*\)"$/\1/p' values.yaml)
+          EKS_CLUSTER_NAME="${ARIZE_CLUSTER_ARN##*/}"
           if [ -z "${ARIZE_CLUSTER_ARN}" ]; then
-            echo "::error::clusterName not found in config/values.yaml" >&2
+            echo "::error::clusterName not found in values.yaml" >&2
             exit 1
           fi
           actual_arn=$(aws eks describe-cluster --region "${AWS_REGION}" \
             --name "${EKS_CLUSTER_NAME}" --query 'cluster.arn' --output text)
           if [ "${actual_arn}" != "${ARIZE_CLUSTER_ARN}" ]; then
-            echo "::error::EKS_CLUSTER_NAME=${EKS_CLUSTER_NAME} resolves to ${actual_arn}, but config/values.yaml targets ${ARIZE_CLUSTER_ARN}" >&2
+            echo "::error::cluster ${EKS_CLUSTER_NAME} resolves to ${actual_arn}, but values.yaml targets ${ARIZE_CLUSTER_ARN}" >&2
             exit 1
           fi
           aws eks update-kubeconfig --region "${AWS_REGION}" \
@@ -222,9 +229,10 @@ jobs:
 
       - name: Download the distribution
         env:
-          JWT: ${{ secrets.ARIZE_HUB_JWT_RAW }}
+          ARIZE_HUB_JWT: ${{ secrets.ARIZE_HUB_JWT }}
         run: |
           set -euo pipefail
+          JWT="$(printf '%s' "${ARIZE_HUB_JWT}" | base64 --decode)"
           mkdir -p dist && cd dist
           # Piped to bash, not sh: the vendor's script uses `set -o pipefail`,
           # which dash (Ubuntu's /bin/sh) rejects with "Illegal option -o pipefail".
@@ -244,9 +252,8 @@ jobs:
             --dir dist \
             --expect "${TARGET_VERSION}"
 
-      - name: Render values.yaml
+      - name: Render values.yaml from checked-in config and Secrets
         env:
-          # Credentials -> environment Secrets
           ARIZE_HUB_JWT: ${{ secrets.ARIZE_HUB_JWT }}
           ARIZE_CIPHER_KEY: ${{ secrets.ARIZE_CIPHER_KEY }}
           ARIZE_POSTGRES_PASSWORD: ${{ secrets.ARIZE_POSTGRES_PASSWORD }}
@@ -257,9 +264,9 @@ jobs:
           ARIZE_INTERNAL_TLS_KEY: ${{ secrets.ARIZE_INTERNAL_TLS_KEY }}
           ARIZE_FLIGHT_TLS_CERT: ${{ secrets.ARIZE_FLIGHT_TLS_CERT }}
           ARIZE_FLIGHT_TLS_KEY: ${{ secrets.ARIZE_FLIGHT_TLS_KEY }}
-          # Non-secret config is literal in config/values.yaml (checked in),
-          # so only Secrets are injected here.
-        run: ./scripts/render-values.sh "${{ steps.bundle.outputs.bundle_dir }}/values.yaml"
+        run: |
+          set -euo pipefail
+          scripts/render-values.sh "${{ steps.bundle.outputs.bundle_dir }}/values.yaml"
 
       - name: Mark the cluster as about to be modified
         id: mark
@@ -325,6 +332,7 @@ jobs:
           TARGET_VERSION: ${{ inputs.target_version }}
         run: |
           set -euo pipefail
+          export APP_BASE_URL="$(sed -n 's/^appBaseUrl: *"\(.*\)"$/\1/p' values.yaml)"
           arize-upgrade notify \
             --stage result \
             --target "${TARGET_VERSION}" \

@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
-# Render config/values.yaml (checked in, secrets externalised) into a working values.yaml.
+# Render the checked-in values.yaml with GitHub Environment Secrets.
 # Usage: scripts/render-values.sh <output-path>
 #
 # Never cat or log the output: it contains private keys and passwords.
 set -euo pipefail
 
 OUTPUT="${1:?usage: render-values.sh <output-path>}"
-TEMPLATE="$(dirname "$0")/../config/values.yaml"
+TEMPLATE="$(dirname "$0")/../values.yaml"
 
-# Secrets only. Everything else is literal in config/values.yaml, which is
-# checked in so the effective config is reviewable in a diff.
+# Secrets only. Everything else is literal in values.yaml, which is
+# checked in so the non-secret config is reviewable in a diff.
 # Missing any of these must fail closed and name it.
 REQUIRED=(
   ARIZE_HUB_JWT
